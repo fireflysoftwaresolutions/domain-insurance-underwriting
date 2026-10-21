@@ -2,9 +2,9 @@ openapi: 3.0.1
 info:
   title: Domain Insurance Underwriting API
   description: "Orchestrates underwriting submissions through core-insurance-underwriting.\
-    \ It records submission status through the underwriting core. It does not call\
-    \ the sanctions screen on that core, and it does not certify IFRS 17 or Solvency\
-    \ II."
+    \ It creates, updates, changes status, and closes submissions through the underwriting\
+    \ core. It does not call the sanctions screen on that core, and it does not certify\
+    \ IFRS 17 or Solvency II."
   contact:
     name: Firefly Software Foundation
     email: dev@fireflysoftware.io
@@ -55,36 +55,6 @@ paths:
                 $ref: "#/components/schemas/SubmissionDTO"
         "404":
           description: Not found
-  /api/v1/submissions:
-    post:
-      tags:
-      - Underwriting
-      summary: Create submission
-      description: Runs the register saga against core-insurance-underwriting.
-      operationId: create
-      parameters:
-      - name: X-Idempotency-Key
-        in: header
-        description: "Unique key for idempotent requests. If provided, ensures that\
-          \ identical requests with the same key will only be processed once."
-        required: false
-        schema:
-          type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/SubmissionDTO"
-        required: true
-      responses:
-        "201":
-          description: Created
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/SubmissionDTO"
-        "400":
-          description: Invalid request
   /api/v1/submissions/{submissionId}:
     get:
       tags:
@@ -116,6 +86,174 @@ paths:
                 $ref: "#/components/schemas/SubmissionDTO"
         "404":
           description: Not found
+    put:
+      tags:
+      - Underwriting
+      summary: Update submission
+      description: Runs the update saga against core-insurance-underwriting. Status
+        is left unchanged.
+      operationId: update
+      parameters:
+      - name: submissionId
+        in: path
+        description: Core identifier
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: X-Idempotency-Key
+        in: header
+        description: "Unique key for idempotent requests. If provided, ensures that\
+          \ identical requests with the same key will only be processed once."
+        required: false
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmissionDTO"
+        required: true
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubmissionDTO"
+        "404":
+          description: Not found
+    delete:
+      tags:
+      - Underwriting
+      summary: Remove submission
+      description: Deletes the record through core-insurance-underwriting when that
+        core allows removal.
+      operationId: remove
+      parameters:
+      - name: submissionId
+        in: path
+        description: Core identifier
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: X-Idempotency-Key
+        in: header
+        description: "Unique key for idempotent requests. If provided, ensures that\
+          \ identical requests with the same key will only be processed once."
+        required: false
+        schema:
+          type: string
+      responses:
+        "204":
+          description: Removed
+        "404":
+          description: Not found
+  /api/v1/submissions/{submissionId}/withdraw:
+    post:
+      tags:
+      - Underwriting
+      summary: Withdraw submission
+      description: Withdraws a submission when the underwriting core allows WITHDRAWN.
+      operationId: withdraw
+      parameters:
+      - name: submissionId
+        in: path
+        description: Core identifier
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: X-Idempotency-Key
+        in: header
+        description: "Unique key for idempotent requests. If provided, ensures that\
+          \ identical requests with the same key will only be processed once."
+        required: false
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReasonRequest"
+        required: true
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubmissionDTO"
+        "404":
+          description: Not found
+  /api/v1/submissions/{submissionId}/decline:
+    post:
+      tags:
+      - Underwriting
+      summary: Decline submission
+      description: Declines a submission when the underwriting core allows DECLINED.
+      operationId: decline
+      parameters:
+      - name: submissionId
+        in: path
+        description: Core identifier
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: X-Idempotency-Key
+        in: header
+        description: "Unique key for idempotent requests. If provided, ensures that\
+          \ identical requests with the same key will only be processed once."
+        required: false
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReasonRequest"
+        required: true
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubmissionDTO"
+        "404":
+          description: Not found
+  /api/v1/submissions:
+    post:
+      tags:
+      - Underwriting
+      summary: Create submission
+      description: Runs the register saga against core-insurance-underwriting.
+      operationId: create
+      parameters:
+      - name: X-Idempotency-Key
+        in: header
+        description: "Unique key for idempotent requests. If provided, ensures that\
+          \ identical requests with the same key will only be processed once."
+        required: false
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmissionDTO"
+        required: true
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubmissionDTO"
+        "400":
+          description: Invalid request
 components:
   schemas:
     StatusChangeRequest:
@@ -195,3 +333,8 @@ components:
           type: string
           format: date-time
           nullable: true
+    ReasonRequest:
+      type: object
+      properties:
+        statusReason:
+          type: string

@@ -38,7 +38,7 @@ import org.springframework.web.reactive.config.EnableWebFlux;
 info = @Info(
         title = "Domain Insurance Underwriting API",
         version = "1.0.0",
-        description = "Orchestrates underwriting submissions through core-insurance-underwriting. It records submission status through the underwriting core. It does not call the sanctions screen on that core, and it does not certify IFRS 17 or Solvency II.",
+        description = "Orchestrates underwriting submissions through core-insurance-underwriting. It creates, updates, changes status, and closes submissions through the underwriting core. It does not call the sanctions screen on that core, and it does not certify IFRS 17 or Solvency II.",
         contact = @Contact(
                 name = "Firefly Software Foundation",
                 email = "dev@fireflysoftware.io"

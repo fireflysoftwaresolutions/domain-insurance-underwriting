@@ -44,6 +44,14 @@ public final class SubmissionSagaConstants {
     public static final String CTX_RECORD = "submissionIdRecord";
     public static final String CTX_PREVIOUS_STATUS = "previousSubmissionStatus";
 
+
+    public static final String SAGA_UPDATE_RECORD = "UpdateSubmissionSaga";
+    public static final String STEP_RETRIEVE_FOR_UPDATE = "retrieveSubmissionForUpdate";
+    public static final String STEP_UPDATE_RECORD = "updateSubmission";
+    public static final String COMPENSATE_RESTORE_RECORD = "restoreSubmission";
+    public static final String EVENT_RECORD_UPDATED = "submissions.updated";
+    public static final String CTX_PREVIOUS_RECORD = "previousSubmissionRecord";
+
     private SubmissionSagaConstants() {
     }
 }

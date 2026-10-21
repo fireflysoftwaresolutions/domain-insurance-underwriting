@@ -18,6 +18,7 @@ package io.fireflysoftware.domain.insurance.underwriting.web.controllers;
 
 import io.fireflysoftware.core.insurance.underwriting.sdk.model.SubmissionDTO;
 import io.fireflysoftware.domain.insurance.underwriting.core.services.UnderwritingService;
+import io.fireflysoftware.domain.insurance.underwriting.interfaces.dtos.ReasonRequest;
 import io.fireflysoftware.domain.insurance.underwriting.interfaces.dtos.StatusChangeRequest;
 import org.fireflyframework.web.error.config.ErrorHandlingProperties;
 import org.fireflyframework.web.error.converter.ExceptionConverterService;
@@ -107,5 +108,46 @@ class SubmissionsControllerTest {
                 .exchange()
                 .expectStatus().isOk()
                 .expectBody(SubmissionDTO.class);
+    }
+
+    @Test
+    void update_returns200() {
+        UUID id = UUID.randomUUID();
+        when(service.update(any())).thenReturn(Mono.just(new SubmissionDTO(id)));
+
+        webTestClient.put()
+                .uri("/api/v1/submissions/{id}", id)
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(new SubmissionDTO())
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(SubmissionDTO.class);
+    }
+
+    @Test
+    void withdraw_returns200() {
+        UUID id = UUID.randomUUID();
+        when(service.withdraw(any(), any())).thenReturn(Mono.just(new SubmissionDTO(id)));
+        ReasonRequest request = new ReasonRequest();
+        request.setStatusReason("Caller request");
+
+        webTestClient.post()
+                .uri("/api/v1/submissions/{id}/withdraw", id)
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(request)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(SubmissionDTO.class);
+    }
+
+    @Test
+    void remove_returns204() {
+        UUID id = UUID.randomUUID();
+        when(service.remove(id)).thenReturn(Mono.empty());
+
+        webTestClient.delete()
+                .uri("/api/v1/submissions/{id}", id)
+                .exchange()
+                .expectStatus().isNoContent();
     }
 }

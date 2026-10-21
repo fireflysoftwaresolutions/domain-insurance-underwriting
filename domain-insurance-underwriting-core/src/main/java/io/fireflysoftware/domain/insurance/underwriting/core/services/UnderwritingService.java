@@ -19,6 +19,7 @@ package io.fireflysoftware.domain.insurance.underwriting.core.services;
 import io.fireflysoftware.core.insurance.underwriting.sdk.model.SubmissionDTO;
 import io.fireflysoftware.domain.insurance.underwriting.core.commands.CreateSubmissionCommand;
 import io.fireflysoftware.domain.insurance.underwriting.core.commands.UpdateSubmissionStatusCommand;
+import io.fireflysoftware.domain.insurance.underwriting.core.commands.UpdateSubmissionCommand;
 import reactor.core.publisher.Mono;
 
 import java.util.UUID;
@@ -51,4 +52,38 @@ public interface UnderwritingService {
      * @return the record, or empty when the core has none
      */
     Mono<SubmissionDTO> get(UUID submissionId);
+
+    /**
+     * Updates fields on a submission and leaves its status unchanged.
+     *
+     * @param command the update
+     * @return the record returned by the core
+     */
+    Mono<SubmissionDTO> update(UpdateSubmissionCommand command);
+
+    /**
+     * Withdraws a submission when the underwriting core allows WITHDRAWN.
+     *
+     * @param submissionId the core identifier
+     * @param statusReason optional reason stored by the status saga when the core keeps one
+     * @return the updated record
+     */
+    Mono<SubmissionDTO> withdraw(UUID submissionId, String statusReason);
+
+    /**
+     * Declines a submission when the underwriting core allows DECLINED.
+     *
+     * @param submissionId the core identifier
+     * @param statusReason optional reason stored by the status saga when the core keeps one
+     * @return the updated record
+     */
+    Mono<SubmissionDTO> decline(UUID submissionId, String statusReason);
+
+    /**
+     * Deletes a submission when the core lifecycle allows removal.
+     *
+     * @param submissionId the core identifier
+     * @return completion when the core has deleted the record
+     */
+    Mono<Void> remove(UUID submissionId);
 }

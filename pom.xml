@@ -15,7 +15,7 @@
     <name>domain-insurance-underwriting</name>
     <version>26.10.3</version>
     <packaging>pom</packaging>
-    <description>Orchestrates underwriting submissions and status changes through the underwriting core. Developed by the Firefly Software Foundation.</description>
+    <description>Orchestrates underwriting submission create, update, status, and close commands through the underwriting core. Developed by the Firefly Software Foundation.</description>
     <url>https://openplatform.fireflysoftware.io/domain-insurance-underwriting</url>
 
     <modules>
