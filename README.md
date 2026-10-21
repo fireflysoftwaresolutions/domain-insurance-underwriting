@@ -72,7 +72,7 @@ Status values accepted by the core: `RECEIVED`, `IN_CLEARANCE`, `REFERRED`, `QUO
 
 - Java 25
 - Apache Maven 3.9+
-- `core-insurance-underwriting-sdk` 26.10.3
+- `core-insurance-underwriting-sdk` 26.10.4
 - Apache Kafka on `localhost:9092` when event publishing is left at the default
 
 ### Environment
