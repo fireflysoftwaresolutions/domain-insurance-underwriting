@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>io.fireflysoftware</groupId>
+        <artifactId>firefly-parent</artifactId>
+        <version>26.10.3</version>
+        <relativePath/>
+    </parent>
+
+    <artifactId>domain-insurance-underwriting</artifactId>
+    <name>domain-insurance-underwriting</name>
+    <version>26.10.3</version>
+    <packaging>pom</packaging>
+    <description>Orchestrates underwriting submissions and status changes through the underwriting core. Developed by the Firefly Software Foundation.</description>
+    <url>https://openplatform.fireflysoftware.io/domain-insurance-underwriting</url>
+
+    <modules>
+        <module>domain-insurance-underwriting-core</module>
+        <module>domain-insurance-underwriting-interfaces</module>
+        <module>domain-insurance-underwriting-web</module>
+        <module>domain-insurance-underwriting-sdk</module>
+        <module>domain-insurance-underwriting-infra</module>
+    </modules>
+
+    <properties>
+        <java.version>25</java.version>
+        <maven.compiler.source>${java.version}</maven.compiler.source>
+        <maven.compiler.target>${java.version}</maven.compiler.target>
+        <maven.compiler.release>${java.version}</maven.compiler.release>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>io.fireflysoftware</groupId>
+                <artifactId>core-insurance-underwriting-sdk</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.fireflysoftware</groupId>
+                <artifactId>domain-insurance-underwriting-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.fireflysoftware</groupId>
+                <artifactId>domain-insurance-underwriting-interfaces</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.fireflysoftware</groupId>
+                <artifactId>domain-insurance-underwriting-web</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.fireflysoftware</groupId>
+                <artifactId>domain-insurance-underwriting-sdk</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.fireflysoftware</groupId>
+                <artifactId>domain-insurance-underwriting-infra</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+</project>

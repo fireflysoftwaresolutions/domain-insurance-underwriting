@@ -1,0 +1,197 @@
+openapi: 3.0.1
+info:
+  title: Domain Insurance Underwriting API
+  description: "Orchestrates underwriting submissions through core-insurance-underwriting.\
+    \ It records submission status through the underwriting core. It does not call\
+    \ the sanctions screen on that core, and it does not certify IFRS 17 or Solvency\
+    \ II."
+  contact:
+    name: Firefly Software Foundation
+    email: dev@fireflysoftware.io
+  version: 1.0.0
+servers:
+- url: https://openplatform.fireflysoftware.io/domain-insurance-underwriting
+  description: Development Environment
+- url: /
+  description: Local Development Environment
+tags:
+- name: Underwriting
+  description: Domain orchestration for underwriting submissions
+paths:
+  /api/v1/submissions/{submissionId}/status:
+    put:
+      tags:
+      - Underwriting
+      summary: Update status
+      description: Runs the status saga against core-insurance-underwriting.
+      operationId: updateStatus
+      parameters:
+      - name: submissionId
+        in: path
+        description: Core identifier
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: X-Idempotency-Key
+        in: header
+        description: "Unique key for idempotent requests. If provided, ensures that\
+          \ identical requests with the same key will only be processed once."
+        required: false
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StatusChangeRequest"
+        required: true
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubmissionDTO"
+        "404":
+          description: Not found
+  /api/v1/submissions:
+    post:
+      tags:
+      - Underwriting
+      summary: Create submission
+      description: Runs the register saga against core-insurance-underwriting.
+      operationId: create
+      parameters:
+      - name: X-Idempotency-Key
+        in: header
+        description: "Unique key for idempotent requests. If provided, ensures that\
+          \ identical requests with the same key will only be processed once."
+        required: false
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmissionDTO"
+        required: true
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubmissionDTO"
+        "400":
+          description: Invalid request
+  /api/v1/submissions/{submissionId}:
+    get:
+      tags:
+      - Underwriting
+      summary: Get submission
+      description: Reads one record from core-insurance-underwriting.
+      operationId: get
+      parameters:
+      - name: submissionId
+        in: path
+        description: Core identifier
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: X-Idempotency-Key
+        in: header
+        description: "Unique key for idempotent requests. If provided, ensures that\
+          \ identical requests with the same key will only be processed once."
+        required: false
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubmissionDTO"
+        "404":
+          description: Not found
+components:
+  schemas:
+    StatusChangeRequest:
+      type: object
+      properties:
+        status:
+          type: string
+        statusReason:
+          type: string
+    SubmissionDTO:
+      required:
+      - lineOfBusiness
+      - partyId
+      - productId
+      - receivedAt
+      - submissionNumber
+      - submissionStatus
+      - tenantId
+      type: object
+      properties:
+        submissionId:
+          type: string
+          format: uuid
+          nullable: true
+        tenantId:
+          type: string
+          format: uuid
+        submissionNumber:
+          type: string
+        partyId:
+          type: string
+          format: uuid
+        productId:
+          type: string
+          format: uuid
+        distributorId:
+          type: string
+          format: uuid
+          nullable: true
+        contractId:
+          type: string
+          format: uuid
+          nullable: true
+        submissionStatus:
+          type: string
+          enum:
+          - RECEIVED
+          - IN_CLEARANCE
+          - REFERRED
+          - QUOTED
+          - BOUND
+          - DECLINED
+          - WITHDRAWN
+        lineOfBusiness:
+          type: string
+          enum:
+          - MOTOR
+          - PROPERTY
+          - LIABILITY
+          - LIFE
+          - HEALTH
+          - MARINE
+          - AVIATION
+          - ACCIDENT
+          - OTHER
+        receivedAt:
+          type: string
+          format: date-time
+        currency:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+          nullable: true
+        updatedAt:
+          type: string
+          format: date-time
+          nullable: true

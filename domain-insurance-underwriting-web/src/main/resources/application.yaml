@@ -1,0 +1,122 @@
+spring:
+  application:
+    name: domain-insurance-underwriting
+    version: 1.0.0
+    description: Domain orchestration for underwriting submissions
+    team:
+      name: Firefly Software Foundation
+      email: dev@fireflysoftware.io
+
+  threads:
+    virtual:
+      enabled: true
+
+firefly:
+  cqrs:
+    enabled: true
+    command:
+      timeout: 30s
+      metrics-enabled: true
+      tracing-enabled: true
+    query:
+      timeout: 15s
+      caching-enabled: true
+      cache-ttl: 15m
+  saga.performance.enabled: true
+
+  eda:
+    enabled: true
+    default-publisher-type: KAFKA
+    default-connection-id: default
+    publishers:
+      kafka:
+        default:
+          enabled: true
+          default-topic: domain-layer
+          bootstrap-servers: localhost:9092
+
+  stepevents:
+    enabled: true
+
+server:
+  address: ${SERVER_ADDRESS:localhost}
+  port: ${SERVER_PORT:8073}
+  shutdown: graceful
+
+api-configuration:
+  core-insurance:
+    underwriting:
+      base-path: ${ENDPOINT_CORE_INSURANCE_UNDERWRITING:http://localhost:8080}
+
+springdoc:
+  api-docs:
+    enabled: true
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    tagsSorter: alpha
+    operationsSorter: method
+    docExpansion: none
+    filter: true
+  packages-to-scan: io.fireflysoftware.domain.insurance.underwriting.web.controllers
+  paths-to-match: /api/**
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      show-details: when-authorized
+      probes:
+        enabled: true
+  health:
+    livenessState:
+      enabled: true
+    readinessState:
+      enabled: true
+
+logging:
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
+---
+spring:
+  config:
+    activate:
+      on-profile: dev
+
+logging:
+  level:
+    root: INFO
+    io.fireflysoftware: DEBUG
+
+---
+spring:
+  config:
+    activate:
+      on-profile: pre
+
+logging:
+  level:
+    root: INFO
+    io.fireflysoftware: INFO
+
+---
+spring:
+  config:
+    activate:
+      on-profile: prod
+
+logging:
+  level:
+    root: WARN
+    io.fireflysoftware: INFO
+    org.springframework: WARN
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
