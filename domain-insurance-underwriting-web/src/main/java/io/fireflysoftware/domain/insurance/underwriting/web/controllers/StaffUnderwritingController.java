@@ -26,7 +26,7 @@ import reactor.core.publisher.Mono;
 @Tag(name="StaffUnderwriting",description="Staff referral creation, independent approval, decision and original-action recovery through the Core owner.")
 @SecurityScheme(name="staffUnderwritingBearer",type=SecuritySchemeType.HTTP,scheme="bearer",bearerFormat="JWT")
 @SecurityRequirement(name="staffUnderwritingBearer")
-public final class StaffUnderwritingController {
+public class StaffUnderwritingController {
     private final ObjectProvider<GovernedStaffUnderwritingService> services;
     public StaffUnderwritingController(ObjectProvider<GovernedStaffUnderwritingService> services){this.services=services;}
 
