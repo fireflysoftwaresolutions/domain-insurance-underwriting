@@ -62,6 +62,14 @@
             <scope>test</scope>
         </dependency>
 
+        <dependency>
+            <groupId>org.fireflyframework</groupId>
+            <artifactId>fireflyframework-security-oauth2-client</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.fireflyframework</groupId>
+            <artifactId>fireflyframework-security-resource-server</artifactId>
+        </dependency>
     </dependencies>
 
 </project>

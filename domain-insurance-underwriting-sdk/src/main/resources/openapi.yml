@@ -15,8 +15,14 @@ servers:
 - url: /
   description: Local Development Environment
 tags:
+- name: GovernedQuoteOffers
+  description: "Exact owner offer, acceptance and recovery. Acceptance does not bind\
+    \ or issue a policy."
 - name: Underwriting
   description: Domain orchestration for underwriting submissions
+- name: StaffUnderwriting
+  description: "Staff referral creation, independent approval, decision and original-action\
+    \ recovery through the Core owner."
 paths:
   /api/v1/submissions/{submissionId}/status:
     put:
@@ -35,8 +41,10 @@ paths:
           format: uuid
       - name: X-Idempotency-Key
         in: header
-        description: "Unique key for idempotent requests. If provided, ensures that\
-          \ identical requests with the same key will only be processed once."
+        description: "Optional retry key for scoped POST, PUT, PATCH, and DELETE response\
+          \ reuse. Safe methods ignore it. Reuse requires configured trusted identity\
+          \ and namespace; changed input returns 409. Business effects require durable\
+          \ application idempotency."
         required: false
         schema:
           type: string
@@ -72,8 +80,10 @@ paths:
           format: uuid
       - name: X-Idempotency-Key
         in: header
-        description: "Unique key for idempotent requests. If provided, ensures that\
-          \ identical requests with the same key will only be processed once."
+        description: "Optional retry key for scoped POST, PUT, PATCH, and DELETE response\
+          \ reuse. Safe methods ignore it. Reuse requires configured trusted identity\
+          \ and namespace; changed input returns 409. Business effects require durable\
+          \ application idempotency."
         required: false
         schema:
           type: string
@@ -103,8 +113,10 @@ paths:
           format: uuid
       - name: X-Idempotency-Key
         in: header
-        description: "Unique key for idempotent requests. If provided, ensures that\
-          \ identical requests with the same key will only be processed once."
+        description: "Optional retry key for scoped POST, PUT, PATCH, and DELETE response\
+          \ reuse. Safe methods ignore it. Reuse requires configured trusted identity\
+          \ and namespace; changed input returns 409. Business effects require durable\
+          \ application idempotency."
         required: false
         schema:
           type: string
@@ -140,8 +152,10 @@ paths:
           format: uuid
       - name: X-Idempotency-Key
         in: header
-        description: "Unique key for idempotent requests. If provided, ensures that\
-          \ identical requests with the same key will only be processed once."
+        description: "Optional retry key for scoped POST, PUT, PATCH, and DELETE response\
+          \ reuse. Safe methods ignore it. Reuse requires configured trusted identity\
+          \ and namespace; changed input returns 409. Business effects require durable\
+          \ application idempotency."
         required: false
         schema:
           type: string
@@ -150,6 +164,245 @@ paths:
           description: Removed
         "404":
           description: Not found
+  /api/v1/tenants/{tenantId}/submissions/{submissionId}/parties/{partyId}/products/{productId}/quote-offers:
+    get:
+      tags:
+      - GovernedQuoteOffers
+      summary: Read owner-ordered authorized quote history
+      operationId: history
+      parameters:
+      - name: tenantId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: submissionId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: partyId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: productId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Bearer authentication is required; an inbound filter may return
+            an empty body
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Current authorization is required; an inbound filter may return
+            an empty body
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "502":
+          description: "Owner outcome is unconfirmed; this is not a refusal, absence\
+            \ or retry instruction"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: Trusted owner client is absent before invocation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuoteHistoryResponse"
+      security:
+      - governedQuoteBearer: []
+      x-disable-idempotency: true
+    post:
+      tags:
+      - GovernedQuoteOffers
+      summary: Request an exact governed quote offer
+      operationId: offer
+      parameters:
+      - name: tenantId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: submissionId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: partyId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: productId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuoteOfferRequest"
+        required: true
+      responses:
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Bearer authentication is required; an inbound filter may return
+            an empty body
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Current authorization is required; an inbound filter may return
+            an empty body
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "502":
+          description: "Owner outcome is unconfirmed; this is not a refusal, absence\
+            \ or retry instruction"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: Trusted owner client is absent before invocation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuoteCommandResponse"
+      security:
+      - governedQuoteBearer: []
+      x-disable-idempotency: true
+  /api/v1/tenants/{tenantId}/submissions/{submissionId}/parties/{partyId}/products/{productId}/quote-offers/{offerId}/acceptances:
+    post:
+      tags:
+      - GovernedQuoteOffers
+      summary: "Accept the original offer version, control and terms"
+      operationId: accept
+      parameters:
+      - name: tenantId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: submissionId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: partyId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: productId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: offerId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuoteAcceptanceRequest"
+        required: true
+      responses:
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Bearer authentication is required; an inbound filter may return
+            an empty body
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Current authorization is required; an inbound filter may return
+            an empty body
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "502":
+          description: "Owner outcome is unconfirmed; this is not a refusal, absence\
+            \ or retry instruction"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: Trusted owner client is absent before invocation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuoteCommandResponse"
+      security:
+      - governedQuoteBearer: []
+      x-disable-idempotency: true
   /api/v1/submissions/{submissionId}/withdraw:
     post:
       tags:
@@ -167,8 +420,10 @@ paths:
           format: uuid
       - name: X-Idempotency-Key
         in: header
-        description: "Unique key for idempotent requests. If provided, ensures that\
-          \ identical requests with the same key will only be processed once."
+        description: "Optional retry key for scoped POST, PUT, PATCH, and DELETE response\
+          \ reuse. Safe methods ignore it. Reuse requires configured trusted identity\
+          \ and namespace; changed input returns 409. Business effects require durable\
+          \ application idempotency."
         required: false
         schema:
           type: string
@@ -204,8 +459,10 @@ paths:
           format: uuid
       - name: X-Idempotency-Key
         in: header
-        description: "Unique key for idempotent requests. If provided, ensures that\
-          \ identical requests with the same key will only be processed once."
+        description: "Optional retry key for scoped POST, PUT, PATCH, and DELETE response\
+          \ reuse. Safe methods ignore it. Reuse requires configured trusted identity\
+          \ and namespace; changed input returns 409. Business effects require durable\
+          \ application idempotency."
         required: false
         schema:
           type: string
@@ -234,8 +491,10 @@ paths:
       parameters:
       - name: X-Idempotency-Key
         in: header
-        description: "Unique key for idempotent requests. If provided, ensures that\
-          \ identical requests with the same key will only be processed once."
+        description: "Optional retry key for scoped POST, PUT, PATCH, and DELETE response\
+          \ reuse. Safe methods ignore it. Reuse requires configured trusted identity\
+          \ and namespace; changed input returns 409. Business effects require durable\
+          \ application idempotency."
         required: false
         schema:
           type: string
@@ -254,6 +513,255 @@ paths:
                 $ref: "#/components/schemas/SubmissionDTO"
         "400":
           description: Invalid request
+  /api/v1/staff/underwriting/intents:
+    post:
+      tags:
+      - StaffUnderwriting
+      summary: Prepare an original staff operation without mutating business data
+      operationId: prepareStaffUnderwritingIntent
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GovernedUnderwritingIntent"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GovernedUnderwritingPreparedIntent"
+      security:
+      - staffUnderwritingBearer: []
+      x-disable-idempotency: true
+  /api/v1/staff/underwriting/actions:
+    post:
+      tags:
+      - StaffUnderwriting
+      summary: Execute the exact prepared owner action once
+      operationId: executeStaffUnderwritingAction
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GovernedUnderwritingCommandRequest"
+        required: true
+      responses:
+        "200":
+          description: "Original owner result: committed or refused"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GovernedUnderwritingCommandResponse"
+        "503":
+          description: "Known commit with unavailable receipt, uncertain outcome or\
+            \ pre-dispatch platform failure. Keep the original action for recovery."
+          content:
+            application/json:
+              schema:
+                oneOf:
+                - $ref: "#/components/schemas/GovernedUnderwritingCommandResponse"
+                - $ref: "#/components/schemas/ErrorResponse"
+                - $ref: "#/components/schemas/ProblemDetail"
+      security:
+      - staffUnderwritingBearer: []
+      x-disable-idempotency: true
+  /api/v1/tenants/{tenantId}/submissions/{submissionId}/parties/{partyId}/products/{productId}/quote-offers/{offerId}:
+    get:
+      tags:
+      - GovernedQuoteOffers
+      summary: Read the current authorized offer and acceptance receipt
+      operationId: current
+      parameters:
+      - name: tenantId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: submissionId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: partyId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: productId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: offerId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Bearer authentication is required; an inbound filter may return
+            an empty body
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Current authorization is required; an inbound filter may return
+            an empty body
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "502":
+          description: "Owner outcome is unconfirmed; this is not a refusal, absence\
+            \ or retry instruction"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: Trusted owner client is absent before invocation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuoteReadResponse"
+      security:
+      - governedQuoteBearer: []
+      x-disable-idempotency: true
+  ? /api/v1/tenants/{tenantId}/submissions/{submissionId}/parties/{partyId}/products/{productId}/quote-offers/actions/{actionId}/recovery
+  : get:
+      tags:
+      - GovernedQuoteOffers
+      summary: Recover an existing action without another mutation
+      operationId: recover
+      parameters:
+      - name: tenantId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: submissionId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: partyId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: productId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: actionId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: expectedIntentDigest
+        in: query
+        required: true
+        schema:
+          pattern: "[0-9a-f]{64}"
+          type: string
+      responses:
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Bearer authentication is required; an inbound filter may return
+            an empty body
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Current authorization is required; an inbound filter may return
+            an empty body
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "502":
+          description: "Owner outcome is unconfirmed; this is not a refusal, absence\
+            \ or retry instruction"
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+        "503":
+          description: Trusted owner client is absent before invocation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuoteRecoveryResponse"
+      security:
+      - governedQuoteBearer: []
+      x-disable-idempotency: true
+  /api/v1/staff/underwriting/actions/{actionId}:
+    get:
+      tags:
+      - StaffUnderwriting
+      summary: Read the original action without repeating the mutation
+      operationId: recoverStaffUnderwritingAction
+      parameters:
+      - name: actionId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: intentDigest
+        in: query
+        required: true
+        schema:
+          pattern: "[0-9a-f]{64}"
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GovernedUnderwritingRecovery"
+      security:
+      - staffUnderwritingBearer: []
+      x-disable-idempotency: true
 components:
   schemas:
     StatusChangeRequest:
@@ -333,8 +841,627 @@ components:
           type: string
           format: date-time
           nullable: true
+    QuoteOfferRequest:
+      required:
+      - actionId
+      - coverageEnd
+      - coverageStart
+      - expectedProductDigest
+      - expectedProductRevisionId
+      type: object
+      properties:
+        actionId:
+          type: string
+          format: uuid
+        coverageStart:
+          type: string
+          format: date
+        coverageEnd:
+          type: string
+          format: date
+        expectedProductRevisionId:
+          type: string
+          format: uuid
+        expectedProductDigest:
+          type: string
+    CircuitBreakerInfo:
+      type: object
+      properties:
+        state:
+          type: string
+        name:
+          type: string
+        failureRate:
+          type: number
+          format: double
+        failureRateThreshold:
+          type: number
+          format: double
+        failureCount:
+          type: integer
+          format: int32
+        nextAttemptTime:
+          type: integer
+          format: int64
+        fallbackSuggestion:
+          type: string
+    ErrorResponse:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        status:
+          type: integer
+          format: int32
+        error:
+          type: string
+        message:
+          type: string
+        code:
+          type: string
+        path:
+          type: string
+        traceId:
+          type: string
+        spanId:
+          type: string
+        correlationId:
+          type: string
+        requestId:
+          type: string
+        details:
+          type: string
+        suggestion:
+          type: string
+        documentation:
+          type: string
+        helpUrl:
+          type: string
+        instance:
+          type: string
+        category:
+          type: string
+          enum:
+          - VALIDATION
+          - BUSINESS
+          - TECHNICAL
+          - SECURITY
+          - EXTERNAL
+          - RESOURCE
+          - RATE_LIMIT
+          - CIRCUIT_BREAKER
+          - UNKNOWN
+        severity:
+          type: string
+          enum:
+          - LOW
+          - MEDIUM
+          - HIGH
+          - CRITICAL
+        retryable:
+          type: boolean
+        rateLimitInfo:
+          $ref: "#/components/schemas/RateLimitInfo"
+        circuitBreakerInfo:
+          $ref: "#/components/schemas/CircuitBreakerInfo"
+        metadata:
+          type: object
+          additionalProperties:
+            type: object
+        errors:
+          type: array
+          items:
+            $ref: "#/components/schemas/ValidationError"
+        stackTrace:
+          type: string
+        debugInfo:
+          type: object
+          additionalProperties:
+            type: object
+        retry_after:
+          type: integer
+          format: int32
+    RateLimitInfo:
+      type: object
+      properties:
+        limit:
+          type: integer
+          format: int32
+        remaining:
+          type: integer
+          format: int32
+        resetTime:
+          type: integer
+          format: int64
+        windowSeconds:
+          type: integer
+          format: int32
+        limitType:
+          type: string
+    ValidationError:
+      type: object
+      properties:
+        field:
+          type: string
+        code:
+          type: string
+        message:
+          type: string
+        metadata:
+          type: object
+          additionalProperties:
+            type: object
+    ProblemDetail:
+      type: object
+      properties:
+        type:
+          type: string
+          format: uri
+        title:
+          type: string
+        status:
+          type: integer
+          format: int32
+        detail:
+          type: string
+        instance:
+          type: string
+          format: uri
+        extensions:
+          type: object
+          additionalProperties:
+            type: object
+    QuoteActionEnvelope:
+      type: object
+      properties:
+        scope:
+          $ref: "#/components/schemas/QuoteOfferScope"
+        ownerIssuer:
+          type: string
+          nullable: true
+        ownerSubject:
+          type: string
+          nullable: true
+        operation:
+          type: string
+          nullable: true
+          enum:
+          - OFFER
+          - ACCEPT
+        offerId:
+          type: string
+          format: uuid
+          nullable: true
+        offerVersion:
+          type: integer
+          format: int64
+          nullable: true
+        expectedControlGeneration:
+          type: integer
+          format: int64
+          nullable: true
+        actionId:
+          type: string
+          format: uuid
+          nullable: true
+        intentDigest:
+          type: string
+          nullable: true
+    QuoteCommandResponse:
+      required:
+      - actionId
+      - intentDigest
+      - status
+      type: object
+      properties:
+        status:
+          type: string
+          enum:
+          - COMMITTED
+          - COMMITTED_RESPONSE_UNAVAILABLE
+          - OUTCOME_UNKNOWN
+          - REFUSED
+        actionId:
+          type: string
+          format: uuid
+        intentDigest:
+          type: string
+        result:
+          anyOf:
+          - $ref: "#/components/schemas/QuoteResultEnvelope"
+          - type: object
+            nullable: true
+            enum:
+            - null
+    QuoteOfferScope:
+      type: object
+      properties:
+        tenantId:
+          type: string
+          format: uuid
+          nullable: true
+        submissionId:
+          type: string
+          format: uuid
+          nullable: true
+        partyId:
+          type: string
+          format: uuid
+          nullable: true
+        productId:
+          type: string
+          format: uuid
+          nullable: true
+    QuoteResultEnvelope:
+      type: object
+      properties:
+        action:
+          $ref: "#/components/schemas/QuoteActionEnvelope"
+        resultId:
+          type: string
+          format: uuid
+          nullable: true
+        offerVersionId:
+          type: string
+          format: uuid
+          nullable: true
+        acceptanceId:
+          type: string
+          format: uuid
+          nullable: true
+        recordedAt:
+          type: string
+          format: date-time
+          nullable: true
+        resultingControlGeneration:
+          type: integer
+          format: int64
+          nullable: true
+    QuoteAcceptanceRequest:
+      required:
+      - actionId
+      - expectedControlGeneration
+      - offerVersion
+      - termsDigest
+      type: object
+      properties:
+        actionId:
+          type: string
+          format: uuid
+        offerVersion:
+          type: integer
+          format: int64
+        expectedControlGeneration:
+          type: integer
+          format: int64
+        termsDigest:
+          type: string
     ReasonRequest:
       type: object
       properties:
         statusReason:
           type: string
+    GovernedUnderwritingIntent:
+      required:
+      - actionId
+      - expectedReferralVersion
+      - operation
+      - riskId
+      - submissionId
+      type: object
+      properties:
+        operation:
+          type: string
+          enum:
+          - REFERRAL_CREATE
+          - REFERRAL_APPROVE
+          - DECISION_RECORD
+        actionId:
+          type: string
+          format: uuid
+        submissionId:
+          type: string
+          format: uuid
+        riskId:
+          type: string
+          format: uuid
+        referralId:
+          type: string
+          format: uuid
+          nullable: true
+        expectedReferralVersion:
+          type: integer
+          format: int64
+        expectedReceiptDigest:
+          type: string
+          nullable: true
+        reason:
+          type: string
+          nullable: true
+    GovernedUnderwritingPreparedIntent:
+      required:
+      - actionId
+      - intentDigest
+      - operation
+      type: object
+      properties:
+        operation:
+          type: string
+          enum:
+          - REFERRAL_CREATE
+          - REFERRAL_APPROVE
+          - DECISION_RECORD
+        actionId:
+          type: string
+          format: uuid
+        intentDigest:
+          type: string
+    GovernedUnderwritingCommandRequest:
+      required:
+      - intent
+      - originalIntentDigest
+      type: object
+      properties:
+        intent:
+          $ref: "#/components/schemas/GovernedUnderwritingIntent"
+        originalIntentDigest:
+          type: string
+    GovernedUnderwritingCommandResponse:
+      required:
+      - actionId
+      - intentDigest
+      - status
+      type: object
+      properties:
+        status:
+          type: string
+          enum:
+          - COMMITTED
+          - COMMITTED_RESPONSE_UNAVAILABLE
+          - OUTCOME_UNKNOWN
+          - REFUSED
+        actionId:
+          type: string
+          format: uuid
+        intentDigest:
+          type: string
+        receipt:
+          $ref: "#/components/schemas/GovernedUnderwritingReceipt"
+    GovernedUnderwritingReceipt:
+      required:
+      - actionId
+      - intentDigest
+      - operation
+      - receiptDigest
+      - referralId
+      - referralVersion
+      type: object
+      properties:
+        actionId:
+          type: string
+          format: uuid
+        intentDigest:
+          type: string
+        operation:
+          type: string
+          enum:
+          - REFERRAL_CREATE
+          - REFERRAL_APPROVE
+          - DECISION_RECORD
+        referralId:
+          type: string
+          format: uuid
+        referralVersion:
+          type: integer
+          format: int64
+        decisionId:
+          type: string
+          format: uuid
+          nullable: true
+        receiptDigest:
+          type: string
+    Entry:
+      required:
+      - offer
+      - termsDigest
+      type: object
+      properties:
+        offer:
+          $ref: "#/components/schemas/QuoteOfferVersion"
+        termsDigest:
+          type: string
+        receipt:
+          anyOf:
+          - $ref: "#/components/schemas/QuoteAcceptanceReceipt"
+          - type: object
+            nullable: true
+            enum:
+            - null
+    QuoteAcceptanceIntent:
+      type: object
+      properties:
+        scope:
+          $ref: "#/components/schemas/QuoteOfferScope"
+        offerId:
+          type: string
+          format: uuid
+          nullable: true
+        offerVersion:
+          type: integer
+          format: int64
+          nullable: true
+        expectedControlGeneration:
+          type: integer
+          format: int64
+          nullable: true
+        termsDigest:
+          type: string
+          nullable: true
+        actionId:
+          type: string
+          format: uuid
+          nullable: true
+    QuoteAcceptanceReceipt:
+      type: object
+      properties:
+        intent:
+          $ref: "#/components/schemas/QuoteAcceptanceIntent"
+        acceptedAt:
+          type: string
+          format: date-time
+          nullable: true
+        resultingControlGeneration:
+          type: integer
+          format: int64
+          nullable: true
+    QuoteHistoryResponse:
+      required:
+      - entries
+      type: object
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/Entry"
+    QuoteOfferTerms:
+      type: object
+      properties:
+        currency:
+          type: string
+          nullable: true
+        basePremium:
+          type: number
+          nullable: true
+        tax:
+          type: number
+          nullable: true
+        fees:
+          type: number
+          nullable: true
+        coverageTerms:
+          type: object
+          additionalProperties:
+            type: string
+          nullable: true
+        productRevisionId:
+          type: string
+          format: uuid
+          nullable: true
+        productDigest:
+          type: string
+          nullable: true
+        riskDigest:
+          type: string
+          nullable: true
+        providerVersion:
+          type: string
+          nullable: true
+        ruleSetVersion:
+          type: string
+          nullable: true
+    QuoteOfferVersion:
+      type: object
+      properties:
+        scope:
+          $ref: "#/components/schemas/QuoteOfferScope"
+        offerId:
+          type: string
+          format: uuid
+          nullable: true
+        offerVersion:
+          type: integer
+          format: int64
+          nullable: true
+        controlGeneration:
+          type: integer
+          format: int64
+          nullable: true
+        state:
+          type: string
+          nullable: true
+          enum:
+          - OFFERED
+          - ACCEPTED
+          - WITHDRAWN
+        terms:
+          $ref: "#/components/schemas/QuoteOfferTerms"
+        issuedAt:
+          type: string
+          format: date-time
+          nullable: true
+        expiresAt:
+          type: string
+          format: date-time
+          nullable: true
+    QuoteReadResponse:
+      required:
+      - state
+      type: object
+      properties:
+        state:
+          type: string
+          enum:
+          - FOUND
+          - NOT_OBSERVED_AT_THIS_READ
+        entry:
+          anyOf:
+          - $ref: "#/components/schemas/Entry"
+          - type: object
+            nullable: true
+            enum:
+            - null
+    QuoteRecoveryResponse:
+      required:
+      - actionId
+      - intentDigest
+      - state
+      type: object
+      properties:
+        state:
+          type: string
+          enum:
+          - FOUND
+          - NOT_OBSERVED_AT_THIS_READ
+          - INTENT_CONFLICT
+        actionId:
+          type: string
+          format: uuid
+        intentDigest:
+          type: string
+        result:
+          anyOf:
+          - $ref: "#/components/schemas/QuoteResultEnvelope"
+          - type: object
+            nullable: true
+            enum:
+            - null
+    GovernedUnderwritingRecovery:
+      required:
+      - actionId
+      - intentDigest
+      - state
+      type: object
+      properties:
+        state:
+          type: string
+          enum:
+          - FOUND
+          - NOT_OBSERVED_AT_THIS_READ
+          - INTENT_CONFLICT
+        actionId:
+          type: string
+          format: uuid
+        intentDigest:
+          type: string
+        receipt:
+          $ref: "#/components/schemas/GovernedUnderwritingReceipt"
+  securitySchemes:
+    governedQuoteBearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    staffUnderwritingBearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

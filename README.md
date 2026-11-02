@@ -21,9 +21,15 @@ Repository: [https://github.com/fireflysoftwaresolutions/domain-insurance-underw
 
 ## Overview
 
-`domain-insurance-underwriting` sits between experience services and `core-insurance-underwriting`. Write operations run through the FireflyFramework saga engine. Queries use the CQRS query bus. The domain depends on the core SDK only. It does not import another core's internal packages. Identifiers that point at parties, contracts, products, or policies stay UUIDs owned by those cores.
+`domain-insurance-underwriting` sits between experience services and `core-insurance-underwriting`. Existing submission writes run through the FireflyFramework saga engine. Queries use the CQRS query bus. Governed quote and staff operations delegate their atomic business effects to the Core owner through its generated SDK; Domain preserves the original action, current caller, outcome, and recovery identity. The domain depends on the core SDK only. It does not import another core's internal packages. Identifiers that point at parties, contracts, products, or policies stay UUIDs owned by those cores.
 
 It creates, updates, changes status, and closes submissions through the underwriting core. It does not call the sanctions screen on that core, and it does not certify IFRS 17 or Solvency II.
+
+### Governed staff underwriting
+
+Staff applications can prepare and execute referral creation, independent approval, and decision recording, then recover the original operation. The Domain exchanges the original signed staff token with Spring RFC8693 and uses the generated Core SDK. It does not persist business records or replace the authenticated employee with a request field.
+
+Read [Governed staff underwriting](docs/STAFF_UNDERWRITING.md) for the operation sequence, generated Domain SDK, exact scopes, trust configuration, typed outcomes, and recovery behavior. The full original OpenAPI retains submission and quote operations alongside the staff routes. Source and generated-client qualification are complete for this block; complete policy lifecycle and original Experience→Domain→Core service execution remain separate integration gates.
 
 ### Key features
 
@@ -73,6 +79,7 @@ Status values accepted by the core: `RECEIVED`, `IN_CLEARANCE`, `REFERRED`, `QUO
 - Java 25
 - Apache Maven 3.9+
 - `core-insurance-underwriting-sdk` 26.10.6
+- A separately provisioned PostgreSQL technical cache for this Domain service, with its own database and runtime login
 - Apache Kafka on `localhost:9092` when event publishing is left at the default
 
 ### Environment
@@ -82,6 +89,17 @@ Status values accepted by the core: `RECEIVED`, `IN_CLEARANCE`, `REFERRED`, `QUO
 | `SERVER_ADDRESS` | `localhost` | Bind address |
 | `SERVER_PORT` | `8073` | HTTP port |
 | `ENDPOINT_CORE_INSURANCE_UNDERWRITING` | `http://localhost:8080` | Base URL of `core-insurance-underwriting` |
+| `CACHE_DB_HOST` | `localhost` | PostgreSQL technical-cache host |
+| `CACHE_DB_PORT` | `5432` | PostgreSQL technical-cache port |
+| `CACHE_DB_NAME` | Required | Domain technical-cache database, separate from the Core business database |
+| `CACHE_DB_USERNAME` | Required | Dedicated Domain cache runtime login |
+| `CACHE_DB_PASSWORD` | Required | Cache login password supplied by the deployment secret mechanism |
+| `CACHE_DB_SSL_MODE` | `verify-full` | PostgreSQL TLS verification mode |
+| `CACHE_DB_SCHEMA` | `firefly_insurance_underwriting_domain_cache` | Provisioned technical-cache schema |
+
+The managed PostgreSQL cache provider is enabled by default and Redis is disabled. Provision the cache schema and `cache_entries` table before startup; automatic schema creation is disabled. The runtime login needs only the cache permissions required by the provider, not ownership or access to Core business tables. The pool is bounded to two connections. Configure the cache environment before running the application.
+
+Domain excludes Spring Boot's business JDBC and R2DBC auto-configuration. The cache's dedicated connection factory supports technical cache operations only. It does not create authoritative referrals, decisions, actions, audit records, or outbox rows; the Core underwriting service owns those business effects through its generated SDK. The validated staff controller remains proxyable so that the original application can start with method validation enabled.
 
 ### Build and test
 

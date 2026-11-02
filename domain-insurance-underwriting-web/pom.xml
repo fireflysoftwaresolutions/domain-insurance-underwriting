@@ -22,6 +22,10 @@
 
     <dependencies>
         <dependency>
+            <groupId>org.fireflyframework</groupId>
+            <artifactId>fireflyframework-cache-postgres</artifactId>
+        </dependency>
+        <dependency>
             <groupId>io.fireflysoftware</groupId>
             <artifactId>domain-insurance-underwriting-interfaces</artifactId>
         </dependency>
