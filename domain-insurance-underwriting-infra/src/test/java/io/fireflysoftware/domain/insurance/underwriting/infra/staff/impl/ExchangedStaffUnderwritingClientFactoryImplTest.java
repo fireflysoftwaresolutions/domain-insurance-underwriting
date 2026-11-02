@@ -50,9 +50,10 @@ class ExchangedStaffUnderwritingClientFactoryImplTest {
         var decoder=NimbusReactiveJwtDecoder.withPublicKey((RSAPublicKey)KEY.getPublic()).build();
         decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(JwtValidators.createDefaultWithIssuer(ISSUER),new JwtTimestampValidator(Duration.ZERO),jwt->List.of(audience).equals(jwt.getAudience())?OAuth2TokenValidatorResult.success():OAuth2TokenValidatorResult.failure(new OAuth2Error("invalid_token"))));return decoder;
     }
-    private static JwtAuthenticationToken original() throws Exception {
-        var jwt=decoder("domain").decode(signed(true,Map.of(),KEY)).block(LIMIT);assertNotNull(jwt);
-        var mapper=mock(AuthorityMappingPort.class);when(mapper.mapAuthorities(anyMap())).thenReturn(Set.of("ROLE_STAFF"));when(mapper.mapScopes(anyMap())).thenReturn(Set.of(SCOPE));
+    private static JwtAuthenticationToken original() throws Exception {return original(SCOPE);}
+    private static JwtAuthenticationToken original(String selectedScope) throws Exception {
+        var jwt=decoder("domain").decode(signed(true,Map.of("scope",selectedScope),KEY)).block(LIMIT);assertNotNull(jwt);
+        var mapper=mock(AuthorityMappingPort.class);when(mapper.mapAuthorities(anyMap())).thenReturn(Set.of("ROLE_STAFF"));when(mapper.mapScopes(anyMap())).thenReturn(Set.of(selectedScope));
         var principal=new PrincipalFactory(mapper).fromClaims(jwt.getSubject(),ISSUER,jwt.getClaims()).toBuilder()
             .tenantId("opaque-tenant").attributes(Map.of("staffActorId",STAFF)).build();
         return new JwtAuthenticationToken(jwt,principal,List.of(new SimpleGrantedAuthority("ROLE_STAFF")));
@@ -62,19 +63,24 @@ class ExchangedStaffUnderwritingClientFactoryImplTest {
     private static final class Fixture implements AutoCloseable {
         final HttpServer server;final AtomicInteger calls=new AtomicInteger();final AtomicReference<String> body=new AtomicReference<>(),authorization=new AtomicReference<>();
         final AtomicReference<Throwable> failure=new AtomicReference<>();final AtomicLong nanos=new AtomicLong();final String clientCredential=UUID.randomUUID().toString();
-        final StaffUnderwritingSettings settings;String reply;Runnable during=()->{};
-        Fixture(String reply) throws Exception {
-            this.reply=reply;server=HttpServer.create(new InetSocketAddress("127.0.0.1",0),0);
+        final StaffUnderwritingSettings settings;final String selectedScope;String reply;Runnable during=()->{};
+        final AtomicInteger readCalls=new AtomicInteger();final AtomicReference<String> readAuthorization=new AtomicReference<>();
+        Fixture(String reply) throws Exception {this(reply,SCOPE);}
+        Fixture(String reply,String selectedScope) throws Exception {
+            this.reply=reply;this.selectedScope=selectedScope;server=HttpServer.create(new InetSocketAddress("127.0.0.1",0),0);
             server.createContext("/token",request->{try{
                 calls.incrementAndGet();assertEquals("POST",request.getRequestMethod());authorization.set(request.getRequestHeaders().getFirst("Authorization"));
                 byte[] input=request.getRequestBody().readNBytes(32769);assertTrue(input.length<=32768);body.set(new String(input,StandardCharsets.UTF_8));during.run();
                 byte[] output=this.reply.getBytes(StandardCharsets.UTF_8);request.getResponseHeaders().set("Content-Type","application/json");request.sendResponseHeaders(200,output.length);request.getResponseBody().write(output);
+            }catch(Throwable error){failure.set(error);}finally{request.close();}});server.createContext("/api/v1/submissions/",request->{try{
+                readCalls.incrementAndGet();assertEquals("GET",request.getRequestMethod());readAuthorization.set(request.getRequestHeaders().getFirst("Authorization"));
+                assertNull(request.getRequestHeaders().getFirst("X-Idempotency-Key"));request.sendResponseHeaders(404,-1);
             }catch(Throwable error){failure.set(error);}finally{request.close();}});server.start();
-            settings=new StaffUnderwritingSettings(true,URI.create("https://owner.invalid"),ISSUER,URI.create(ISSUER+"/jwks"),"domain","core","experience-client","domain-client","exchange","opaque-tenant",true);
+            settings=new StaffUnderwritingSettings(true,URI.create(selectedScope.equals(SCOPE)?"https://owner.invalid":"http://127.0.0.1:"+server.getAddress().getPort()),ISSUER,URI.create(ISSUER+"/jwks"),"domain","core","experience-client","domain-client","exchange","opaque-tenant",true);
         }
         ExchangedStaffUnderwritingClientFactoryImpl owner(){var registration=ClientRegistration.withRegistrationId("exchange").clientId("domain-client").clientSecret(clientCredential)
             .authorizationGrantType(AuthorizationGrantType.TOKEN_EXCHANGE).clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC).issuerUri(ISSUER)
-            .tokenUri("http://127.0.0.1:"+server.getAddress().getPort()+"/token").scope(SCOPE).build();
+            .tokenUri("http://127.0.0.1:"+server.getAddress().getPort()+"/token").scope(selectedScope).build();
             return new ExchangedStaffUnderwritingClientFactoryImpl(settings,new InMemoryReactiveClientRegistrationRepository(registration),decoder("core"),new JdkClientHttpConnector(HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NEVER).build()),Clock.systemUTC(),nanos::get);
         }
         StaffUnderwritingClientFactory.Client acquire(JwtAuthenticationToken original){return owner().current("Bearer "+original.getToken().getTokenValue(),Set.of(SCOPE)).contextWrite(ReactiveSecurityContextHolder.withAuthentication(original)).block(LIMIT);}
@@ -120,4 +126,23 @@ class ExchangedStaffUnderwritingClientFactoryImplTest {
             try(var fixture=new Fixture(invalid)){assertThrows(ResponseStatusException.class,()->fixture.acquire(original));assertEquals(1,fixture.calls.get());}
         }
     }
+    @Test void exactReadDelegationUsesCurrentStaffAndNamedGeneratedGetBearer() throws Exception {
+        String read="insurance:underwriting:submissions:read";var original=original(read);String target=signed(false,Map.of("scope",read),KEY);
+        try(var fixture=new Fixture(response(target).replace(SCOPE,read),read)){
+            var lease=fixture.owner().current("Bearer "+original.getToken().getTokenValue(),Set.of(read)).contextWrite(ReactiveSecurityContextHolder.withAuthentication(original)).block(LIMIT);
+            assertNotNull(lease);assertEquals(read,form(fixture.body.get()).get("scope"));assertEquals("core",form(fixture.body.get()).get("audience"));
+            assertEquals(original.getToken().getTokenValue(),form(fixture.body.get()).get("subject_token"));
+            var missing=assertThrows(org.springframework.web.reactive.function.client.WebClientResponseException.class,()->new io.fireflysoftware.core.insurance.underwriting.sdk.api.SubmissionsApi(lease.api().getApiClient()).getSubmissionByIdWithHttpInfo(UUID.randomUUID(),null).block(LIMIT));
+            assertEquals(404,missing.getStatusCode().value());assertEquals(1,fixture.calls.get());assertEquals(1,fixture.readCalls.get());
+            assertTrue(("Bearer "+target).equals(fixture.readAuthorization.get()),"Generated existing GET must carry its current exchanged bearer");
+        }
+    }
+    @Test void combinedReadAndWriteScopeIsRejectedBeforeAnyExchange() throws Exception {
+        String read="insurance:underwriting:submissions:read";var original=original(read);
+        try(var fixture=new Fixture(response(signed(false,Map.of("scope",read),KEY)).replace(SCOPE,read),read)){
+            assertThrows(ResponseStatusException.class,()->fixture.owner().current("Bearer "+original.getToken().getTokenValue(),Set.of(read,SCOPE)).contextWrite(ReactiveSecurityContextHolder.withAuthentication(original)).block(LIMIT));
+            assertEquals(0,fixture.calls.get());assertEquals(0,fixture.readCalls.get());
+        }
+    }
+
 }

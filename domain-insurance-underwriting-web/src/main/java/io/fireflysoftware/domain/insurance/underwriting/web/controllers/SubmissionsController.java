@@ -55,8 +55,12 @@ public class SubmissionsController {
 
     private final UnderwritingService service;
 
-    public SubmissionsController(UnderwritingService service) {
+    private final org.springframework.beans.factory.ObjectProvider<io.fireflysoftware.domain.insurance.underwriting.core.services.staff.CurrentStaffSubmissionReader> currentReads;
+
+    public SubmissionsController(UnderwritingService service,
+            org.springframework.beans.factory.ObjectProvider<io.fireflysoftware.domain.insurance.underwriting.core.services.staff.CurrentStaffSubmissionReader> currentReads) {
         this.service = service;
+        this.currentReads = currentReads;
     }
 
     @Operation(summary = "Create submission", description = "Runs the register saga against core-insurance-underwriting.")
@@ -79,12 +83,17 @@ public class SubmissionsController {
                             schema = @Schema(implementation = SubmissionDTO.class))),
             @ApiResponse(responseCode = "404", description = "Not found", content = @Content)
     })
+    @io.swagger.v3.oas.annotations.security.SecurityRequirement(name = "staffUnderwritingBearer")
     @GetMapping(value = "/{submissionId}", produces = MediaType.APPLICATION_JSON_VALUE)
     public Mono<ResponseEntity<SubmissionDTO>> get(
-            @Parameter(description = "Core identifier", required = true) @PathVariable UUID submissionId) {
-        return service.get(submissionId)
-                .map(ResponseEntity::ok)
-                .switchIfEmpty(Mono.just(ResponseEntity.notFound().build()));
+            @Parameter(description = "Core identifier", required = true) @PathVariable UUID submissionId,
+            @Parameter(hidden = true) @org.springframework.web.bind.annotation.RequestHeader(value = "Authorization", required = false) String authorization) {
+        var reader=currentReads.getIfAvailable();
+        if(reader==null)return Mono.error(new org.springframework.web.server.ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,"Current submission read is not configured"));
+        return reader.read(authorization,submissionId).map(ResponseEntity::ok)
+                .onErrorResume(org.springframework.web.server.ResponseStatusException.class, refused ->
+                        refused.getStatusCode().value() == 404
+                                ? Mono.just(ResponseEntity.notFound().build()) : Mono.error(refused));
     }
 
     @Operation(summary = "Update status", description = "Runs the status saga against core-insurance-underwriting.")

@@ -18,6 +18,7 @@ package io.fireflysoftware.domain.insurance.underwriting.web.controllers;
 
 import io.fireflysoftware.core.insurance.underwriting.sdk.model.SubmissionDTO;
 import io.fireflysoftware.domain.insurance.underwriting.core.services.UnderwritingService;
+import io.fireflysoftware.domain.insurance.underwriting.core.services.staff.CurrentStaffSubmissionReader;
 import io.fireflysoftware.domain.insurance.underwriting.interfaces.dtos.ReasonRequest;
 import io.fireflysoftware.domain.insurance.underwriting.interfaces.dtos.StatusChangeRequest;
 import org.fireflyframework.web.error.config.ErrorHandlingProperties;
@@ -27,6 +28,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webflux.test.autoconfigure.WebFluxTest;
 import org.springframework.http.MediaType;
+import org.springframework.http.HttpStatus;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import reactor.core.publisher.Mono;
@@ -47,6 +49,9 @@ class SubmissionsControllerTest {
 
     @MockitoBean
     private UnderwritingService service;
+
+    @MockitoBean
+    private CurrentStaffSubmissionReader currentReads;
 
     @MockitoBean
     private ExceptionConverterService exceptionConverterService;
@@ -73,10 +78,11 @@ class SubmissionsControllerTest {
     @Test
     void get_returns200WhenFound() {
         UUID id = UUID.randomUUID();
-        when(service.get(id)).thenReturn(Mono.just(new SubmissionDTO(id)));
+        when(currentReads.read("Bearer controlled", id)).thenReturn(Mono.just(new SubmissionDTO(id)));
 
         webTestClient.get()
                 .uri("/api/v1/submissions/{id}", id)
+                .header("Authorization", "Bearer controlled")
                 .exchange()
                 .expectStatus().isOk()
                 .expectBody(SubmissionDTO.class);
@@ -85,10 +91,12 @@ class SubmissionsControllerTest {
     @Test
     void get_returns404WhenMissing() {
         UUID id = UUID.randomUUID();
-        when(service.get(id)).thenReturn(Mono.empty());
+        when(currentReads.read("Bearer controlled", id)).thenReturn(Mono.error(
+                new org.springframework.web.server.ResponseStatusException(HttpStatus.NOT_FOUND)));
 
         webTestClient.get()
                 .uri("/api/v1/submissions/{id}", id)
+                .header("Authorization", "Bearer controlled")
                 .exchange()
                 .expectStatus().isNotFound();
     }
