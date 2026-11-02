@@ -1,0 +1,46 @@
+/* Copyright 2026 Firefly Software Foundation. Licensed under the Apache License, Version 2.0. */
+package io.fireflysoftware.domain.insurance.underwriting.core.services.staff.impl;
+
+import io.fireflysoftware.core.insurance.underwriting.sdk.api.GovernedUnderwritingApi;
+import io.fireflysoftware.core.insurance.underwriting.sdk.model.*;
+import io.fireflysoftware.domain.insurance.underwriting.infra.staff.StaffUnderwritingClientFactory;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.util.Set;
+import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.http.*;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
+import org.springframework.web.server.ResponseStatusException;
+import reactor.core.publisher.Mono;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+
+class GovernedStaffUnderwritingServiceTest {
+    private final StaffUnderwritingClientFactory factory=mock(StaffUnderwritingClientFactory.class);
+    private final StaffUnderwritingClientFactory.Client lease=mock(StaffUnderwritingClientFactory.Client.class);
+    private final GovernedUnderwritingApi api=mock(GovernedUnderwritingApi.class);
+    private final GovernedStaffUnderwritingServiceImpl service=new GovernedStaffUnderwritingServiceImpl(factory);
+    private final UUID action=UUID.randomUUID(),submission=UUID.randomUUID(),risk=UUID.randomUUID(),referral=UUID.randomUUID();
+    private final String digest="a".repeat(64);
+    @BeforeEach void setup(){when(factory.current(eq("Bearer original"),anySet())).thenReturn(Mono.just(lease));when(lease.api()).thenReturn(api);when(lease.remaining()).thenReturn(Duration.ofSeconds(5));when(lease.revalidate()).thenReturn(Mono.empty());}
+    private GovernedUnderwritingIntent intent(){return new GovernedUnderwritingIntent().operation(GovernedUnderwritingIntent.OperationEnum.REFERRAL_CREATE).actionId(action).submissionId(submission).riskId(risk).expectedReferralVersion(0L).reason("Review original submission");}
+    private GovernedUnderwritingCommandRequest command(){return new GovernedUnderwritingCommandRequest().intent(intent()).originalIntentDigest(digest);}
+    private GovernedUnderwritingReceipt receipt(){return new GovernedUnderwritingReceipt().actionId(action).intentDigest(digest).operation(GovernedUnderwritingReceipt.OperationEnum.REFERRAL_CREATE).referralId(referral).referralVersion(0L).receiptDigest("b".repeat(64));}
+    private GovernedUnderwritingCommandResponse committed(){return new GovernedUnderwritingCommandResponse().actionId(action).intentDigest(digest).status(GovernedUnderwritingCommandResponse.StatusEnum.COMMITTED).receipt(receipt());}
+    @Test void preparePreservesOriginalActionAndOpaqueOwnerDigest(){when(api.prepareGovernedUnderwritingIntentWithHttpInfo(any())).thenReturn(Mono.just(ResponseEntity.ok(new GovernedUnderwritingPreparedIntent().actionId(action).operation(GovernedUnderwritingPreparedIntent.OperationEnum.REFERRAL_CREATE).intentDigest(digest))));var reply=service.prepare("Bearer original",intent()).block();assertEquals(digest,reply.getIntentDigest());verify(factory).current("Bearer original",Set.of("insurance:underwriting:referrals:create"));verify(api,never()).executeGovernedUnderwritingActionWithHttpInfo(any());}
+    @Test void commandUsesCapturedOriginalIntentAndCallsOwnerOnlyOnce(){var request=command();when(api.executeGovernedUnderwritingActionWithHttpInfo(any())).thenAnswer(call->{var sent=call.getArgument(0,GovernedUnderwritingCommandRequest.class);assertEquals(action,sent.getIntent().getActionId());assertEquals(digest,sent.getOriginalIntentDigest());return Mono.just(ResponseEntity.ok(committed()));});var pending=service.execute("Bearer original",request);request.getIntent().setActionId(UUID.randomUUID());assertEquals(action,pending.block().getActionId());verify(api,times(1)).executeGovernedUnderwritingActionWithHttpInfo(any());}
+    @Test void invalidCommandDoesNotAcquireAuthorityOrInvokeOwner(){assertThrows(ResponseStatusException.class,()->service.execute("Bearer original",new GovernedUnderwritingCommandRequest()).block());verifyNoInteractions(factory,api);}
+    @Test void transportFailureRetainsOriginalActionAsUnknownWithoutRetry(){when(api.executeGovernedUnderwritingActionWithHttpInfo(any())).thenReturn(Mono.error(new IllegalStateException("transport")));var reply=service.execute("Bearer original",command()).block();assertEquals(GovernedUnderwritingCommandResponse.StatusEnum.OUTCOME_UNKNOWN,reply.getStatus());assertEquals(action,reply.getActionId());assertEquals(digest,reply.getIntentDigest());assertNull(reply.getReceipt());verify(api,times(1)).executeGovernedUnderwritingActionWithHttpInfo(any());}
+    @Test void typedOwner503PreservesKnownCommitWithoutReceipt(){String body="{\"status\":\"COMMITTED_RESPONSE_UNAVAILABLE\",\"actionId\":\""+action+"\",\"intentDigest\":\""+digest+"\",\"receipt\":null}";when(api.executeGovernedUnderwritingActionWithHttpInfo(any())).thenReturn(Mono.error(WebClientResponseException.create(503,"Unavailable",HttpHeaders.EMPTY,body.getBytes(StandardCharsets.UTF_8),StandardCharsets.UTF_8)));var reply=service.execute("Bearer original",command()).block();assertEquals(GovernedUnderwritingCommandResponse.StatusEnum.COMMITTED_RESPONSE_UNAVAILABLE,reply.getStatus());assertNull(reply.getReceipt());verify(api,times(1)).executeGovernedUnderwritingActionWithHttpInfo(any());}
+    @Test void lateAuthorityFailureCannotTurnKnownCommitIntoUnknown(){when(api.executeGovernedUnderwritingActionWithHttpInfo(any())).thenReturn(Mono.just(ResponseEntity.ok(committed())));when(lease.revalidate()).thenReturn(Mono.empty(),Mono.error(new ResponseStatusException(HttpStatus.FORBIDDEN)));var reply=service.execute("Bearer original",command()).block();assertEquals(GovernedUnderwritingCommandResponse.StatusEnum.COMMITTED_RESPONSE_UNAVAILABLE,reply.getStatus());assertEquals(action,reply.getActionId());assertNull(reply.getReceipt());}
+    @Test void mismatchedOwnerActionDoesNotConfirmThisOperation(){var wrong=committed().actionId(UUID.randomUUID());when(api.executeGovernedUnderwritingActionWithHttpInfo(any())).thenReturn(Mono.just(ResponseEntity.ok(wrong)));assertEquals(GovernedUnderwritingCommandResponse.StatusEnum.OUTCOME_UNKNOWN,service.execute("Bearer original",command()).block().getStatus());}
+    @Test void ownerRefusalIsNotRetriedOrRecastAsSuccessfulCommit(){when(api.executeGovernedUnderwritingActionWithHttpInfo(any())).thenReturn(Mono.error(WebClientResponseException.create(409,"Conflict",HttpHeaders.EMPTY,new byte[0],StandardCharsets.UTF_8)));var error=assertThrows(ResponseStatusException.class,()->service.execute("Bearer original",command()).block());assertEquals(409,error.getStatusCode().value());verify(api,times(1)).executeGovernedUnderwritingActionWithHttpInfo(any());}
+    @Test void recoveryAbsenceIsReadOnlyAndNeverCreatesAReplacementAction(){var absent=new GovernedUnderwritingRecovery().state(GovernedUnderwritingRecovery.StateEnum.NOT_OBSERVED_AT_THIS_READ).actionId(action).intentDigest(digest);when(api.recoverGovernedUnderwritingActionWithHttpInfo(action,digest)).thenReturn(Mono.just(ResponseEntity.ok(absent)));assertEquals(absent,service.recover("Bearer original",action,digest).block());verify(factory).current("Bearer original",Set.of("insurance:underwriting:actions:recover","insurance:underwriting:read"));verify(api,never()).executeGovernedUnderwritingActionWithHttpInfo(any());}
+    @Test void recoveryCannotReturnAnotherActionsReceipt(){var wrong=new GovernedUnderwritingRecovery().state(GovernedUnderwritingRecovery.StateEnum.FOUND).actionId(action).intentDigest(digest).receipt(receipt().actionId(UUID.randomUUID()));when(api.recoverGovernedUnderwritingActionWithHttpInfo(action,digest)).thenReturn(Mono.just(ResponseEntity.ok(wrong)));assertThrows(ResponseStatusException.class,()->service.recover("Bearer original",action,digest).block());}
+    @Test void actualOwner200KnownCommitRemainsKnown(){when(api.executeGovernedUnderwritingActionWithHttpInfo(any())).thenReturn(Mono.just(ResponseEntity.ok(committed().status(GovernedUnderwritingCommandResponse.StatusEnum.COMMITTED_RESPONSE_UNAVAILABLE).receipt(null))));assertEquals(GovernedUnderwritingCommandResponse.StatusEnum.COMMITTED_RESPONSE_UNAVAILABLE,service.execute("Bearer original",command()).block().getStatus());}
+    @Test void actualOwnerTypedRefusalRemainsARefusal(){when(api.executeGovernedUnderwritingActionWithHttpInfo(any())).thenReturn(Mono.just(ResponseEntity.ok(committed().status(GovernedUnderwritingCommandResponse.StatusEnum.REFUSED).receipt(null))));assertEquals(GovernedUnderwritingCommandResponse.StatusEnum.REFUSED,service.execute("Bearer original",command()).block().getStatus());verify(api,times(1)).executeGovernedUnderwritingActionWithHttpInfo(any());}
+    @Test void originalOwnerCommitWithIncompleteReceiptNeverBecomesUnknown(){when(api.executeGovernedUnderwritingActionWithHttpInfo(any())).thenReturn(Mono.just(ResponseEntity.ok(committed().receipt(null))));assertEquals(GovernedUnderwritingCommandResponse.StatusEnum.COMMITTED_RESPONSE_UNAVAILABLE,service.execute("Bearer original",command()).block().getStatus());}
+}

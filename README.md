@@ -21,9 +21,15 @@ Repository: [https://github.com/fireflysoftwaresolutions/domain-insurance-underw
 
 ## Overview
 
-`domain-insurance-underwriting` sits between experience services and `core-insurance-underwriting`. Write operations run through the FireflyFramework saga engine. Queries use the CQRS query bus. The domain depends on the core SDK only. It does not import another core's internal packages. Identifiers that point at parties, contracts, products, or policies stay UUIDs owned by those cores.
+`domain-insurance-underwriting` sits between experience services and `core-insurance-underwriting`. Existing submission writes run through the FireflyFramework saga engine. Queries use the CQRS query bus. Governed quote and staff operations delegate their atomic business effects to the Core owner through its generated SDK; Domain preserves the original action, current caller, outcome, and recovery identity. The domain depends on the core SDK only. It does not import another core's internal packages. Identifiers that point at parties, contracts, products, or policies stay UUIDs owned by those cores.
 
 It creates, updates, changes status, and closes submissions through the underwriting core. It does not call the sanctions screen on that core, and it does not certify IFRS 17 or Solvency II.
+
+### Governed staff underwriting
+
+Staff applications can prepare and execute referral creation, independent approval, and decision recording, then recover the original operation. The Domain exchanges the original signed staff token with Spring RFC8693 and uses the generated Core SDK. It does not persist business records or replace the authenticated employee with a request field.
+
+Read [Governed staff underwriting](docs/STAFF_UNDERWRITING.md) for the operation sequence, generated Domain SDK, exact scopes, trust configuration, typed outcomes, and recovery behavior. The full original OpenAPI retains submission and quote operations alongside the staff routes. Source and generated-client qualification are complete for this block; complete policy lifecycle and original Experience→Domain→Core service execution remain separate integration gates.
 
 ### Key features
 

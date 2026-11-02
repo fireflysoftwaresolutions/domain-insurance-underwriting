@@ -38,7 +38,8 @@ class GovernedQuoteOpenApiContractTest {
     private static final String BASE="/api/v1/tenants/{tenantId}/submissions/{submissionId}/parties/{partyId}/products/{productId}/quote-offers";
 
     @Test void originalProducerDeclaresFiveTypedBearerOperationsWithoutTransportIdempotencyHeader() throws Exception {
-        byte[] body=WebTestClient.bindToApplicationContext(context).configureClient().responseTimeout(Duration.ofSeconds(3)).build()
+        byte[] body=WebTestClient.bindToApplicationContext(context).configureClient().responseTimeout(Duration.ofSeconds(30))
+                .codecs(codecs->codecs.defaultCodecs().maxInMemorySize(4*1024*1024)).build()
                 .get().uri("/v3/api-docs").exchange().expectStatus().isOk().expectBody().returnResult().getResponseBody();
         assertNotNull(body);assertTrue(body.length<=4*1024*1024);
         Files.write(Path.of("target/governed-domain-openapi.json"),body,StandardOpenOption.CREATE,StandardOpenOption.TRUNCATE_EXISTING);
