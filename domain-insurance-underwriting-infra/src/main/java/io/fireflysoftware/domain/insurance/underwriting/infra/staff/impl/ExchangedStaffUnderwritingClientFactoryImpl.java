@@ -71,7 +71,7 @@ public final class ExchangedStaffUnderwritingClientFactoryImpl implements StaffU
     @Override public Mono<Client> current(String authorization,Set<String> required){
         return Mono.defer(()->{
             Set<String> scopes=Set.copyOf(required);String token=bearer(authorization);
-            if(!(scopes.size()==1&&MUTATIONS.containsAll(scopes))&&!scopes.equals(RECOVERY))throw forbidden();
+            if(!(scopes.size()==1&&MUTATIONS.containsAll(scopes))&&!scopes.equals(RECOVERY)&&!scopes.equals(Set.of("insurance:underwriting:submissions:read")))throw forbidden();
             Instant observed=clock.instant();long started=nanos.getAsLong();
             return authentication().flatMap(original->{
                 Jwt subject=original.getToken();original(original,token,scopes);remaining(started,observed,subject.getExpiresAt());

@@ -42,7 +42,7 @@ class StaffUnderwritingOpenApiContractTest {
         assertEquals("078aa1bb145422a8a52151d490fa5f3826bd076f2913cac998e554a869a73efd",HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(originalTwelve)));
         var priorProducer=new ObjectMapper().readTree(originalTwelve);assertEquals(12,operations(priorProducer).size());
         priorProducer.path("paths").fields().forEachRemaining(path->path.getValue().fields().forEachRemaining(method->{
-            if(VERBS.contains(method.getKey()))assertEquals(method.getValue(),actual.path("paths").path(path.getKey()).path(method.getKey()),"Original producer "+method.getKey()+" "+path.getKey());
+            if(VERBS.contains(method.getKey()))assertOriginalOperation(method.getValue(),actual.path("paths").path(path.getKey()).path(method.getKey()),method.getKey()+" "+path.getKey());
         }));
         priorProducer.path("components").fields().forEachRemaining(section->section.getValue().fields().forEachRemaining(component->
             assertEquals(component.getValue(),actual.path("components").path(section.getKey()).path(component.getKey()),"Original producer "+section.getKey()+"/"+component.getKey())));
@@ -58,6 +58,13 @@ class StaffUnderwritingOpenApiContractTest {
         assertThrows(AssertionError.class,()->assertPublishedOperation(published,changedSchema,"changed header schema"));
         var changedDescription=current.deepCopy();((com.fasterxml.jackson.databind.node.ObjectNode)changedDescription.path("parameters").get(1)).put("description","Unexpected idempotency semantics");
         assertThrows(AssertionError.class,()->assertPublishedOperation(published,changedDescription,"unrecognized header description"));
+        var readRoute="get /api/v1/submissions/{submissionId}";
+        var originalRead=priorProducer.path("paths").path("/api/v1/submissions/{submissionId}").path("get");
+        var currentRead=actual.path("paths").path("/api/v1/submissions/{submissionId}").path("get");
+        var unsignedRead=currentRead.deepCopy();((com.fasterxml.jackson.databind.node.ObjectNode)unsignedRead).remove("security");
+        assertThrows(AssertionError.class,()->assertOriginalOperation(originalRead,unsignedRead,readRoute));
+        var wrongBearer=currentRead.deepCopy();((com.fasterxml.jackson.databind.node.ObjectNode)wrongBearer).putArray("security").addObject().putArray("governedQuoteBearer");
+        assertThrows(AssertionError.class,()->assertOriginalOperation(originalRead,wrongBearer,readRoute));
         assertEquals("bearer",actual.at("/components/securitySchemes/staffUnderwritingBearer/scheme").asText());
         for(var route:List.of(new String[]{"/api/v1/staff/underwriting/intents","post","prepareStaffUnderwritingIntent","GovernedUnderwritingPreparedIntent"},
             new String[]{"/api/v1/staff/underwriting/actions","post","executeStaffUnderwritingAction","GovernedUnderwritingCommandResponse"},
@@ -100,6 +107,15 @@ class StaffUnderwritingOpenApiContractTest {
                 &&"Unique key for idempotent requests. If provided, ensures that identical requests with the same key will only be processed once.".equals(parameter.path("description").asText())){
                 ((com.fasterxml.jackson.databind.node.ObjectNode)parameter).put("description","Optional retry key for scoped POST, PUT, PATCH, and DELETE response reuse. Safe methods ignore it. Reuse requires configured trusted identity and namespace; changed input returns 409. Business effects require durable application idempotency.");
             }
+        }
+        assertOriginalOperation(expected,actual,route);
+    }
+    private static void assertOriginalOperation(JsonNode published,JsonNode actual,String route){
+        var expected=published.deepCopy();
+        if("get /api/v1/submissions/{submissionId}".equals(route)){
+            var security=new ObjectMapper().createArrayNode();security.addObject().putArray("staffUnderwritingBearer");
+            if(expected.has("security"))assertEquals(security,expected.path("security"));
+            ((com.fasterxml.jackson.databind.node.ObjectNode)expected).set("security",security);
         }
         assertEquals(expected,actual,route);
     }

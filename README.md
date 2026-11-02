@@ -129,6 +129,8 @@ Swagger UI (non-production): [http://localhost:8073/swagger-ui.html](http://loca
 
 The status request body is `status` plus an optional `statusReason`.
 
+The existing submission GET requires current signed STAFF delegation with the single scope `insurance:underwriting:submissions:read`. Enable `insurance.underwriting.staff-client.submission-read.enabled` and supply its explicit `resource-tenant-id` alongside the existing registered staff exchange configuration. The reader calls the genuine generated Core `SubmissionsApi`, keeps the current caller lease before and after HTTP, and checks the returned submission and tenant. It has no business persistence or legacy read fallback. A missing reader returns 503; an authorized missing Core record returns 404. Regenerate the complete Core SDK from the actual original producer so the existing GET carries `governedQuoteBearer`; do not edit generated authentication code or reuse an SDK whose GET lacks that declaration.
+
 Withdraw and decline run the status saga and are refused when the underwriting core lifecycle does not allow that move. Remove deletes a received submission only. A later status is kept.
 A closing command body is an optional `statusReason`.
 
